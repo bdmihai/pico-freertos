@@ -40,10 +40,6 @@ extern void vPortEnableInterrupts();
 extern void vPortEnterCritical();
 extern void vPortExitCritical();
 
-/* privilege control */
-extern void vPortRaisePrivilege(void);
-extern void vPortResetPrivilege(void);
-
 /* used to catch tasks that attempt to return from their implementing function. */
 extern void vPortTaskExitError(void);
 

@@ -49,21 +49,9 @@ __attribute__((weak)) void panic(const char *fmt, ...)
  * as there is nothing to return to. If a task wants to exit it should instead call
  * vTaskDelete.
  */
-void vPortTaskExitError( void )
+void vPortTaskExitError(void)
 {
-    volatile uint32_t ulDummy = 0UL;
-
-    /* Artificially force an assert() to be triggered if configASSERT() is defined,
-    then stop here so application writers can catch the error. */
-    configASSERT( uxCriticalNesting == ~0UL );
-    portDISABLE_INTERRUPTS();
-    while( ulDummy == 0 ) {
-        /* ulDummy is used purely to quieten other warnings
-        about code appearing after this function is called - making ulDummy
-        volatile makes the compiler think the function could return and
-        therefore not output an 'unreachable code' warning for code that appears
-        after it. */
-    }
+    panic("vPortTaskExitError: a function that implements a task must not exit or attempt to return");
 }
 
 /**

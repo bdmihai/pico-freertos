@@ -48,7 +48,6 @@ ulSetInterruptMaskFromISR:
 .type vClearInterruptMaskFromISR, %function
 vClearInterruptMaskFromISR:
     msr PRIMASK, r0
-    cpsie i
     bx lr
 
 .size vClearInterruptMaskFromISR, .-vClearInterruptMaskFromISR
@@ -77,7 +76,6 @@ vPortEnableInterrupts:
 
 .size vPortEnableInterrupts, .-vPortEnableInterrupts
 
-
 /*-----------------------------------------------------------*/
 /*                     vPortEnterCritical                    */
 /*-----------------------------------------------------------*/
@@ -90,6 +88,8 @@ vPortEnterCritical:
     ldr r1, [r0]
     adds r1, r1, #1
     str r1, [r0]
+    dsb
+    isb
     bx lr
 
 .size vPortEnterCritical, .-vPortEnterCritical
@@ -118,38 +118,6 @@ vPortExitCritical:
 .align 4
 uxCriticalNesting:
     .word 0xAAAAAAAA
-
-/*-----------------------------------------------------------*/
-/*                     vPortRaisePrivilege                   */
-/*-----------------------------------------------------------*/
-.section .text.vPortRaisePrivilege, "ax", %progbits
-.global vPortRaisePrivilege
-.type vPortRaisePrivilege, %function
-vPortRaisePrivilege:
-    mrs r1, control
-    movs r0, #1
-    bics r1, r0
-    msr control, r1
-    isb
-    bx lr
-
-.size vPortRaisePrivilege, .-vPortRaisePrivilege
-
-/*-----------------------------------------------------------*/
-/*                     vPortResetPrivilege                   */
-/*-----------------------------------------------------------*/
-.section .text.vPortResetPrivilege, "ax", %progbits
-.global vPortResetPrivilege
-.type vPortResetPrivilege, %function
-vPortResetPrivilege:
-    mrs r1, control
-    movs r0, #1
-    orrs r1, r0
-    msr control, r1
-    isb
-    bx lr
-
-.size vPortResetPrivilege, .-vPortResetPrivilege
 
 /*-----------------------------------------------------------*/
 /*                     vPortStartFirstTask                   */
@@ -194,7 +162,6 @@ vPortStartFirstTask:
 .align 4
 pxCurrentTCBConst1: 
     .word pxCurrentTCB
-    //.word __stack0_top
 .size vPortStartFirstTask, .-vPortStartFirstTask
 
 /*-----------------------------------------------------------*/
@@ -230,7 +197,7 @@ vPortPendSVHandler:
     mrs r0, psp
 
     /* get the location of the pxCurrentTCB */
-    ldr	r3, pxCurrentTCBConst
+    ldr	r3, pxCurrentTCBConst2
     ldr	r2, [r3]
 
     /* go down in the stack in order to use the increment after function - M0+ is missing STMDB */
@@ -278,8 +245,9 @@ vPortPendSVHandler:
     /* return from handler mode */
     bx r3
 
-    .align 4
-pxCurrentTCBConst: .word pxCurrentTCB
+.align 4
+pxCurrentTCBConst2: 
+    .word pxCurrentTCB
 
 .size vPortPendSVHandler, .-vPortPendSVHandler
 

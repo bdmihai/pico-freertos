@@ -85,10 +85,10 @@ typedef unsigned long UBaseType_t;
 /*-----------------------------------------------------------*/
 
 /* Critical section management. */
-#define portSET_INTERRUPT_MASK_FROM_ISR()		ulSetInterruptMaskFromISR() //__get_BASEPRI();__set_BASEPRI(configMAX_SYSCALL_INTERRUPT_PRIORITY);__DSB();__ISB()
-#define portCLEAR_INTERRUPT_MASK_FROM_ISR(x)	vClearInterruptMaskFromISR( x ) //__set_BASEPRI(x)
-#define portDISABLE_INTERRUPTS()				vPortDisableInterrupts() //__set_BASEPRI(configMAX_SYSCALL_INTERRUPT_PRIORITY);__DSB();__ISB()
-#define portENABLE_INTERRUPTS()					vPortEnableInterrupts() //__set_BASEPRI(0)
+#define portSET_INTERRUPT_MASK_FROM_ISR()		ulSetInterruptMaskFromISR()
+#define portCLEAR_INTERRUPT_MASK_FROM_ISR(x)	vClearInterruptMaskFromISR( x )
+#define portDISABLE_INTERRUPTS()				vPortDisableInterrupts()
+#define portENABLE_INTERRUPTS()					vPortEnableInterrupts()
 #define portENTER_CRITICAL()					vPortEnterCritical()
 #define portEXIT_CRITICAL()						vPortExitCritical()
 /*-----------------------------------------------------------*/

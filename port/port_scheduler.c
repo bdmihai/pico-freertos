@@ -96,10 +96,7 @@ void vPortServiceHandler(uint32_t *svc_args)
     switch (svc_number)
     {
         case 0:
-            vPortRaisePrivilege();
-            break;
-        case 1:
-            vPortResetPrivilege();
+            vPortYield();
             break;
     }
 }
