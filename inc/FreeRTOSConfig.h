@@ -46,7 +46,7 @@
 #define configUSE_IDLE_HOOK                      0
 #define configUSE_TICK_HOOK                      0
 #define configUSE_MALLOC_FAILED_HOOK             1
-#define configCHECK_FOR_STACK_OVERFLOW           1
+#define configCHECK_FOR_STACK_OVERFLOW           2
 #define configCPU_CLOCK_HZ                       ( (uint32_t) 125000000 )
 #define configTICK_RATE_HZ                       ( (TickType_t) 1000 )
 #define configMAX_PRIORITIES                     16

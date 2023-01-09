@@ -28,31 +28,34 @@
 import qbs.FileInfo
 
 Product {
-    name: "freertos"
-    type: "lib"
+    name: 'freertos'
+    type: 'lib'
 
-    Depends { name: "rp" }
+    Depends { name: 'rp' }
     Depends { name: 'cmsis' }
 
-    rp.includePaths: [ "inc", "port" ]
+    rp.includePaths: [ 'inc', 'port' ]
+    rp.defines: [ 
+        'FREERTOS_IN_RAM=0'
+    ]
 
     files: [
-        "inc/*.h",
-        "src/*.c",
-        "port/*.c",
-        "port/*.h",
-        "port/*.S",
+        'inc/*.h',
+        'src/*.c',
+        'port/*.c',
+        'port/*.h',
+        'port/*.S',
     ]
 
     Export {
-        Depends { name: "rp" }
+        Depends { name: 'rp' }
         Depends { name: 'cmsis' }
         
         rp.includePaths: [
-            FileInfo.joinPaths(exportingProduct.sourceDirectory, "/inc"),
-            FileInfo.joinPaths(exportingProduct.sourceDirectory, "/port")
+            FileInfo.joinPaths(exportingProduct.sourceDirectory, '/inc'),
+            FileInfo.joinPaths(exportingProduct.sourceDirectory, '/port')
         ]
         rp.libraryPaths: [ exportingProduct.destinationDirectory ]
-        rp.linkerFlags: ["-Wl,--undefined=uxTopUsedPriority"]
+        rp.linkerFlags: ['-Wl,--undefined=uxTopUsedPriority']
     }
 }

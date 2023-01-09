@@ -27,10 +27,16 @@
  
 .syntax unified
 
+#if FREERTOS_IN_RAM
+#define port_section data
+#else
+#define port_section text
+#endif
+
 /*-----------------------------------------------------------*/
 /*                  ulSetInterruptMaskFromISR                */
 /*-----------------------------------------------------------*/
-.section .text.ulSetInterruptMaskFromISR, "ax", %progbits
+.section .port_section.ulSetInterruptMaskFromISR, "ax", %progbits
 .global ulSetInterruptMaskFromISR
 .type ulSetInterruptMaskFromISR, %function
 ulSetInterruptMaskFromISR:
@@ -43,7 +49,7 @@ ulSetInterruptMaskFromISR:
 /*-----------------------------------------------------------*/
 /*                  vClearInterruptMaskFromISR               */
 /*-----------------------------------------------------------*/
-.section .text.vClearInterruptMaskFromISR, "ax", %progbits
+.section .port_section.vClearInterruptMaskFromISR, "ax", %progbits
 .global vClearInterruptMaskFromISR
 .type vClearInterruptMaskFromISR, %function
 vClearInterruptMaskFromISR:
@@ -55,7 +61,7 @@ vClearInterruptMaskFromISR:
 /*-----------------------------------------------------------*/
 /*                   vPortDisableInterrupts                  */
 /*-----------------------------------------------------------*/
-.section .text.vPortDisableInterrupts, "ax", %progbits
+.section .port_section.vPortDisableInterrupts, "ax", %progbits
 .global vPortDisableInterrupts
 .type vPortDisableInterrupts, %function
 vPortDisableInterrupts:
@@ -67,7 +73,7 @@ vPortDisableInterrupts:
 /*-----------------------------------------------------------*/
 /*                   vPortEnableInterrupts                   */
 /*-----------------------------------------------------------*/
-.section .text.vPortEnableInterrupts, "ax", %progbits
+.section .port_section.vPortEnableInterrupts, "ax", %progbits
 .global vPortEnableInterrupts
 .type vPortEnableInterrupts, %function
 vPortEnableInterrupts:
@@ -79,7 +85,7 @@ vPortEnableInterrupts:
 /*-----------------------------------------------------------*/
 /*                     vPortEnterCritical                    */
 /*-----------------------------------------------------------*/
-.section .text.vPortEnterCritical, "ax", %progbits
+.section .port_section.vPortEnterCritical, "ax", %progbits
 .global vPortEnterCritical
 .type vPortEnterCritical, %function
 vPortEnterCritical:
@@ -97,7 +103,7 @@ vPortEnterCritical:
 /*-----------------------------------------------------------*/
 /*                      vPortExitCritical                    */
 /*-----------------------------------------------------------*/
-.section .text.vPortExitCritical, "ax", %progbits
+.section .port_section.vPortExitCritical, "ax", %progbits
 .global vPortExitCritical
 .type vPortExitCritical, %function
 vPortExitCritical:
@@ -122,7 +128,7 @@ uxCriticalNesting:
 /*-----------------------------------------------------------*/
 /*                     vPortStartFirstTask                   */
 /*-----------------------------------------------------------*/
-.section .text.vPortStartFirstTask, "ax", %progbits
+.section .port_section.vPortStartFirstTask, "ax", %progbits
 .global vPortStartFirstTask
 .type vPortStartFirstTask, %function
 vPortStartFirstTask:
@@ -167,7 +173,7 @@ pxCurrentTCBConst1:
 /*-----------------------------------------------------------*/
 /*                       vPortSVCHandler                     */
 /*-----------------------------------------------------------*/
-.section .text.vPortSVCHandler, "ax", %progbits
+.section .port_section.vPortSVCHandler, "ax", %progbits
 .global vPortSVCHandler
 .type vPortSVCHandler, %function
 vPortSVCHandler:
@@ -182,14 +188,14 @@ vPortSVCHandler:
 2:
     mrs r0, psp
 3:
-    b vPortServiceHandler
+    bl vPortServiceHandler
 
 .size vPortSVCHandler, .-vPortSVCHandler
 
 /*-----------------------------------------------------------*/
 /*                    vPortPendSVHandler                     */
 /*-----------------------------------------------------------*/
-.section .text.vPortPendSVHandler, "ax", %progbits
+.section .port_section.vPortPendSVHandler, "ax", %progbits
 .global vPortPendSVHandler
 .type vPortPendSVHandler, %function
 vPortPendSVHandler:
