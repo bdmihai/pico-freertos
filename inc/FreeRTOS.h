@@ -291,6 +291,14 @@
     #define configUSE_COUNTING_SEMAPHORES    0
 #endif
 
+#ifndef configUSE_TASK_PREEMPTION_DISABLE
+    #define configUSE_TASK_PREEMPTION_DISABLE    0
+#endif
+
+#ifndef configUSE_CORE_AFFINITY
+    #define configUSE_CORE_AFFINITY    0
+#endif
+
 #ifndef configUSE_ALTERNATIVE_API
     #define configUSE_ALTERNATIVE_API    0
 #endif
@@ -337,6 +345,15 @@
 #ifndef portSOFTWARE_BARRIER
     #define portSOFTWARE_BARRIER()
 #endif
+
+#ifndef configNUM_CORES
+    #define configNUM_CORES    1
+#endif
+
+#ifndef configRUN_MULTIPLE_PRIORITIES
+    #define configRUN_MULTIPLE_PRIORITIES    0
+#endif
+
 
 /* The timers module relies on xTaskGetSchedulerState(). */
 #if configUSE_TIMERS == 1
@@ -1003,6 +1020,18 @@
     #error configUSE_MUTEXES must be set to 1 to use recursive mutexes
 #endif
 
+#if( ( configRUN_MULTIPLE_PRIORITIES == 0 ) && ( configUSE_CORE_AFFINITY != 0 ) )
+    #error configRUN_MULTIPLE_PRIORITIES must be set to 1 to use core exclusion
+#endif
+
+#if( ( configRUN_MULTIPLE_PRIORITIES == 0 ) && ( configUSE_TASK_PREEMPTION_DISABLE != 0 ) )
+    #error configRUN_MULTIPLE_PRIORITIES must be set to 1 to use task preemption disable
+#endif
+
+#if( ( configUSE_PREEMPTION == 0 ) && ( configUSE_TASK_PREEMPTION_DISABLE != 0 ) )
+    #error configUSE_PREEMPTION must be set to 1 to use task preemption disable
+#endif
+
 #ifndef configINITIAL_TICK_COUNT
     #define configINITIAL_TICK_COUNT    0
 #endif
@@ -1259,10 +1288,17 @@ typedef struct xSTATIC_TCB
     #if ( portUSING_MPU_WRAPPERS == 1 )
         xMPU_SETTINGS xDummy2;
     #endif
+    #if ( configUSE_CORE_AFFINITY == 1 && configNUM_CORES > 1 )
+        UBaseType_t uxDummy25;
+    #endif
     StaticListItem_t xDummy3[ 2 ];
     UBaseType_t uxDummy5;
     void * pxDummy6;
+    BaseType_t xDummy23[ 2 ];
     uint8_t ucDummy7[ configMAX_TASK_NAME_LEN ];
+    #if ( configUSE_TASK_PREEMPTION_DISABLE == 1 )
+        BaseType_t xDummy24;
+    #endif
     #if ( ( portSTACK_GROWTH > 0 ) || ( configRECORD_STACK_HIGH_ADDRESS == 1 ) )
         void * pxDummy8;
     #endif
