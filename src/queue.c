@@ -1482,7 +1482,7 @@ BaseType_t xQueueReceive( QueueHandle_t xQueue,
 
                 if( xTaskResumeAll() == pdFALSE )
                 {
-                    portYIELD_WITHIN_API();
+                    vTaskYieldWithinAPI();
                 }
                 else
                 {

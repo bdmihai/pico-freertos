@@ -21,10 +21,14 @@
  | THE USE OR OTHER DEALINGS IN THE SOFTWARE.                                 |
  |____________________________________________________________________________|
  |                                                                            |
- |  Author: Mihai Baneu                           Last modified: 08.Jan.2023  |
+ |  Author: Mihai Baneu                           Last modified: 23.Jan.2023  |
  |  Based on original M0+rp2040 port from http://www.FreeRTOS.org             |
  |___________________________________________________________________________*/
  
+#include "hardware/platform_defs.h"
+#include "hardware/regs/addressmap.h"
+#include "hardware/regs/sio.h"
+
 .syntax unified
 
 #if FREERTOS_IN_RAM
@@ -34,44 +38,33 @@
 #endif
 
 /*-----------------------------------------------------------*/
-/*                  ulSetInterruptMaskFromISR                */
+/*                        vPortGetCoreId                     */
 /*-----------------------------------------------------------*/
-.section .port_section.ulSetInterruptMaskFromISR, "ax", %progbits
-.global ulSetInterruptMaskFromISR
-.type ulSetInterruptMaskFromISR, %function
-ulSetInterruptMaskFromISR:
-    mrs r0, PRIMASK
-    cpsid i
+.section .port_section.vPortGetCoreId, "ax", %progbits
+.global vPortGetCoreId
+.type vPortGetCoreId, %function
+vPortGetCoreId:
+    ldr r0, =(SIO_BASE + SIO_CPUID_OFFSET)
+    ldr r0, [r0]
     bx lr
 
-.size ulSetInterruptMaskFromISR, .-ulSetInterruptMaskFromISR
-
-/*-----------------------------------------------------------*/
-/*                  vClearInterruptMaskFromISR               */
-/*-----------------------------------------------------------*/
-.section .port_section.vClearInterruptMaskFromISR, "ax", %progbits
-.global vClearInterruptMaskFromISR
-.type vClearInterruptMaskFromISR, %function
-vClearInterruptMaskFromISR:
-    msr PRIMASK, r0
-    bx lr
-
-.size vClearInterruptMaskFromISR, .-vClearInterruptMaskFromISR
+.size vPortGetCoreId, .-vPortGetCoreId
 
 /*-----------------------------------------------------------*/
 /*                   vPortDisableInterrupts                  */
 /*-----------------------------------------------------------*/
-.section .port_section.vPortDisableInterrupts, "ax", %progbits
-.global vPortDisableInterrupts
-.type vPortDisableInterrupts, %function
-vPortDisableInterrupts:
+.section .port_section.ulPortDisableInterrupts, "ax", %progbits
+.global ulPortDisableInterrupts
+.type ulPortDisableInterrupts, %function
+ulPortDisableInterrupts:
+    mrs r0, PRIMASK
     cpsid i
     bx lr
 
-.size vPortDisableInterrupts, .-vPortDisableInterrupts
+.size ulPortDisableInterrupts, .-ulPortDisableInterrupts
 
 /*-----------------------------------------------------------*/
-/*                   vPortEnableInterrupts                   */
+/*                   vPortRestoreInterrupts                  */
 /*-----------------------------------------------------------*/
 .section .port_section.vPortEnableInterrupts, "ax", %progbits
 .global vPortEnableInterrupts
@@ -83,47 +76,16 @@ vPortEnableInterrupts:
 .size vPortEnableInterrupts, .-vPortEnableInterrupts
 
 /*-----------------------------------------------------------*/
-/*                     vPortEnterCritical                    */
+/*                    vPortRestoreInterrupts                 */
 /*-----------------------------------------------------------*/
-.section .port_section.vPortEnterCritical, "ax", %progbits
-.global vPortEnterCritical
-.type vPortEnterCritical, %function
-vPortEnterCritical:
-    cpsid i
-    ldr r0, =uxCriticalNesting
-    ldr r1, [r0]
-    adds r1, r1, #1
-    str r1, [r0]
-    dsb
-    isb
+.section .port_section.vPortRestoreInterrupts, "ax", %progbits
+.global vPortRestoreInterrupts
+.type vPortRestoreInterrupts, %function
+vPortRestoreInterrupts:
+    msr PRIMASK, r0
     bx lr
 
-.size vPortEnterCritical, .-vPortEnterCritical
-
-/*-----------------------------------------------------------*/
-/*                      vPortExitCritical                    */
-/*-----------------------------------------------------------*/
-.section .port_section.vPortExitCritical, "ax", %progbits
-.global vPortExitCritical
-.type vPortExitCritical, %function
-vPortExitCritical:
-    ldr r0, =uxCriticalNesting
-    ldr r1, [r0]
-    subs r1, r1, #1
-    str r1, [r0]
-    cmp r1, #0
-    bne 1f
-    cpsie i
-1:
-    bx lr
-
-.size vPortExitCritical, .-vPortExitCritical
-
-.section .data.uxCriticalNesting
-.global uxCriticalNesting
-.align 4
-uxCriticalNesting:
-    .word 0xAAAAAAAA
+.size vPortRestoreInterrupts, .-vPortRestoreInterrupts
 
 /*-----------------------------------------------------------*/
 /*                     vPortStartFirstTask                   */
@@ -132,12 +94,15 @@ uxCriticalNesting:
 .global vPortStartFirstTask
 .type vPortStartFirstTask, %function
 vPortStartFirstTask:
-    /* set the msp back to the start of the stack. */
-    ldr r0, =__stack0_top
-    msr msp, r0
+    /* set the msp back to the start of the stack - r0 has the core index */
+    adr r1, StackPointers
+    lsls r0, #2
+    ldr r1, [r1, r0]
+    msr msp, r1
 
     /* get the location of the pxCurrentTCB */
-    ldr	r2, pxCurrentTCBConst1
+    ldr	r2, =pxCurrentTCBs
+    adds r2, r0
     ldr r3, [r2]
 
     /* first item in pxCurrentTCB is the task top of stack */
@@ -166,8 +131,11 @@ vPortStartFirstTask:
     bx r3
     
 .align 4
-pxCurrentTCBConst1: 
-    .word pxCurrentTCB
+StackPointers:
+    .word __stack0_top
+    .word __stack1_top
+    .word pxCurrentTCBs
+
 .size vPortStartFirstTask, .-vPortStartFirstTask
 
 /*-----------------------------------------------------------*/
@@ -203,7 +171,11 @@ vPortPendSVHandler:
     mrs r0, psp
 
     /* get the location of the pxCurrentTCB */
-    ldr	r3, pxCurrentTCBConst2
+    ldr r1, =(SIO_BASE + SIO_CPUID_OFFSET)
+    ldr r2, [r1]
+    lsls r2, #2
+    ldr	r3, =pxCurrentTCBs
+    adds r3, r2
     ldr	r2, [r3]
 
     /* go down in the stack in order to use the increment after function - M0+ is missing STMDB */
@@ -225,6 +197,7 @@ vPortPendSVHandler:
     /* change the current context (address pointed by pxCurrentTCB) */
     push {r3, r14}
     cpsid i
+    ldr r0, [r1]  /* r0 = core index */
     bl vTaskSwitchContext
     cpsie i
     pop {r2, r3} /* lr goes in r3. r2 now holds tcb pointer. */
@@ -252,8 +225,7 @@ vPortPendSVHandler:
     bx r3
 
 .align 4
-pxCurrentTCBConst2: 
-    .word pxCurrentTCB
+    .word pxCurrentTCBs
 
 .size vPortPendSVHandler, .-vPortPendSVHandler
 

@@ -21,7 +21,7 @@
  | THE USE OR OTHER DEALINGS IN THE SOFTWARE.                                 |
  |____________________________________________________________________________|
  |                                                                            |
- |  Author: Mihai Baneu                           Last modified: 08.Jan.2023  |
+ |  Author: Mihai Baneu                           Last modified: 23.Jan.2023  |
  |  Based on original M0+rp2040 port from http://www.FreeRTOS.org             |
  |___________________________________________________________________________*/
 
@@ -37,6 +37,9 @@
  */
 void vPortConfigureSysTick(void)
 {
+    NVIC_SetVector(SysTick_IRQn, (uint32_t)vPortSysTickHandler);
+    NVIC_SetPriority(SysTick_IRQn, configSysTick_INTERRUPT_PRIORITY);
+    
     /* stop and clear the SysTick. */
     SysTick->CTRL = 0UL;
     SysTick->VAL  = 0UL;
@@ -56,7 +59,8 @@ void vPortConfigureSysTick(void)
  */
 void vPortSysTickHandler(void)
 {
-    portDISABLE_INTERRUPTS();
+    uint32_t ulPreviousMask;
+    ulPreviousMask = portSET_INTERRUPT_MASK_FROM_ISR();
     {
         /* increment the RTOS tick. If necessary trigger a context switch using
         the PendSV interrupt */
@@ -65,5 +69,5 @@ void vPortSysTickHandler(void)
             vPortYield();
         }
     }
-    portENABLE_INTERRUPTS();
+    portCLEAR_INTERRUPT_MASK_FROM_ISR(ulPreviousMask);
 }

@@ -21,24 +21,29 @@
  | THE USE OR OTHER DEALINGS IN THE SOFTWARE.                                 |
  |____________________________________________________________________________|
  |                                                                            |
- |  Author: Mihai Baneu                           Last modified: 08.Jan.2023  |
+ |  Author: Mihai Baneu                           Last modified: 23.Jan.2023  |
  |  Based on original M0+rp2040 port from http://www.FreeRTOS.org             |
  |___________________________________________________________________________*/
 
 #pragma once
 
-/* critical nesting counter maintained by port */
-extern uint32_t uxCriticalNesting;
+/* get the core id and interupt number*/
+extern int32_t vPortGetCoreId();
+extern unsigned int __get_current_exception();
 
-extern uint32_t ulSetInterruptMaskFromISR();
-extern void vClearInterruptMaskFromISR(uint32_t mask);
-
-extern void vPortDisableInterrupts();
+extern uint32_t ulPortDisableInterrupts();
 extern void vPortEnableInterrupts();
+extern void vPortRestoreInterrupts(uint32_t mask);
 
 /* critical section handling */
-extern void vPortEnterCritical();
-extern void vPortExitCritical();
+extern void vTaskEnterCritical();
+extern void vTaskExitCritical();
+
+/* locks handling */
+extern void vPortGetISRLock();
+extern void vPortReleaseISRLock();
+extern void vPortGetTaskLock();
+extern void vPortReleaseTaskLock();
 
 /* used to catch tasks that attempt to return from their implementing function. */
 extern void vPortTaskExitError(void);
@@ -48,6 +53,7 @@ extern void vPortConfigureSysTick(void);
 
 /* yield the next highest prio task */
 extern void vPortYield(void);
+extern void vPortYieldCore(int32_t core);
 
 /* isr handlers */
 extern void vPortSVCHandler();
@@ -55,7 +61,7 @@ extern void vPortPendSVHandler();
 extern void vPortSysTickHandler();
 
 /* start the first task */
-extern void vPortStartFirstTask(void);
+extern void vPortStartFirstTask(int32_t core);
 
 /* svc C handler */
 extern void vPortServiceHandler(uint32_t *svc_args);

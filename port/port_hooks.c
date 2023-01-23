@@ -21,7 +21,7 @@
  | THE USE OR OTHER DEALINGS IN THE SOFTWARE.                                 |
  |____________________________________________________________________________|
  |                                                                            |
- |  Author: Mihai Baneu                           Last modified: 08.Jan.2023  |
+ |  Author: Mihai Baneu                           Last modified: 23.Jan.2023  |
  |  Based on original M0+rp2040 port from http://www.FreeRTOS.org             |
  |___________________________________________________________________________*/
 
@@ -51,3 +51,11 @@ void __attribute__((weak)) vApplicationTickHook() { }
  *
  */
 void __attribute__((weak)) vApplicationIdleHook(void) { }
+
+/**
+ * The minimal idle hook is called repeatedly by the minimal idle tasks as long 
+ * as any one of them is running. It is paramount that the minimal idle hook 
+ * function does not call any API functions that could cause it to block.
+ *
+ */
+void __attribute__((weak)) vApplicationMinimalIdleHook(void) { }

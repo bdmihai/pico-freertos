@@ -1569,6 +1569,12 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
     }
     #endif
 
+    #if ( INCLUDE_xTaskAbortDelay == 1 )
+        {
+            pxNewTCB->ucDelayAborted = pdFALSE;
+        }
+    #endif
+
     #if ( configNUM_CORES > 1 )
         #if ( configUSE_CORE_AFFINITY == 1 )
             {
@@ -1694,7 +1700,7 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB )
                 BaseType_t xCoreID;
 
                 /* Check if a core is free. */
-                for( xCoreID = ( UBaseType_t ) 0; xCoreID < ( UBaseType_t ) configNUM_CORES; xCoreID++ )
+                for( xCoreID = ( BaseType_t ) 0; xCoreID < ( BaseType_t ) configNUM_CORES; xCoreID++ )
             {
                     if( pxCurrentTCBs[ xCoreID ] == NULL )
                 {
@@ -3586,7 +3592,7 @@ BaseType_t xTaskIncrementTick( void )
     BaseType_t xSwitchRequired = pdFALSE;
 
     #if ( configUSE_PREEMPTION == 1 )
-        UBaseType_t x;
+        BaseType_t x;
         BaseType_t xCoreYieldList[ configNUM_CORES ] = { pdFALSE };
     #endif /* configUSE_PREEMPTION */
 
@@ -3701,7 +3707,7 @@ BaseType_t xTaskIncrementTick( void )
                     /* TODO: There are certainly better ways of doing this that would reduce
                      * the number of interrupts and also potentially help prevent tasks from
                      * moving between cores as often. This, however, works for now. */
-                    for( x = ( UBaseType_t ) 0; x < ( UBaseType_t ) configNUM_CORES; x++ )
+                    for( x = ( BaseType_t ) 0; x < ( BaseType_t ) configNUM_CORES; x++ )
             {
                         if( listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ pxCurrentTCBs[ x ]->uxPriority ] ) ) > ( UBaseType_t ) 1 )
                         {
@@ -3732,7 +3738,7 @@ BaseType_t xTaskIncrementTick( void )
 
         #if ( configUSE_PREEMPTION == 1 )
         {
-                    for( x = ( UBaseType_t ) 0; x < ( UBaseType_t ) configNUM_CORES; x++ )
+                    for( x = ( BaseType_t ) 0; x < ( BaseType_t ) configNUM_CORES; x++ )
                     {
                         if( xYieldPendings[ x ] != pdFALSE )
                         {
@@ -3752,7 +3758,7 @@ BaseType_t xTaskIncrementTick( void )
 
                     xCoreID = portGET_CORE_ID();
 
-                    for( x = ( UBaseType_t ) 0; x < ( UBaseType_t ) configNUM_CORES; x++ )
+                    for( x = ( BaseType_t ) 0; x < ( BaseType_t ) configNUM_CORES; x++ )
                     {
                         #if ( configUSE_TASK_PREEMPTION_DISABLE == 1 )
                             if( pxCurrentTCBs[ x ]->xPreemptionDisable == pdFALSE )
@@ -4327,6 +4333,79 @@ void vTaskMissedYield( void )
     }
 
 #endif /* configUSE_TRACE_FACILITY */
+
+/*
+ * -----------------------------------------------------------
+ * The MinimalIdle task.
+ * ----------------------------------------------------------
+ *
+ * The minimal idle task is used for all the additional Cores in a SMP system.
+ * There must be only 1 idle task and the rest are minimal idle tasks.
+ *
+ * @todo additional conditional compiles to remove this function.
+ */
+
+#if ( configNUM_CORES > 1 )
+    static portTASK_FUNCTION( prvMinimalIdleTask, pvParameters )
+    {
+        /* Stop warnings. */
+        ( void ) pvParameters;
+
+        taskYIELD();
+
+        for( ; ; )
+        {
+            #if ( configUSE_PREEMPTION == 0 )
+                {
+                    /* If we are not using preemption we keep forcing a task switch to
+                     * see if any other task has become available.  If we are using
+                     * preemption we don't need to do this as any task becoming available
+                     * will automatically get the processor anyway. */
+                    taskYIELD();
+                }
+            #endif /* configUSE_PREEMPTION */
+
+            #if ( ( configUSE_PREEMPTION == 1 ) && ( configIDLE_SHOULD_YIELD == 1 ) )
+                {
+                    /* When using preemption tasks of equal priority will be
+                     * timesliced.  If a task that is sharing the idle priority is ready
+                     * to run then the idle task should yield before the end of the
+                     * timeslice.
+                     *
+                     * A critical region is not required here as we are just reading from
+                     * the list, and an occasional incorrect value will not matter.  If
+                     * the ready list at the idle priority contains one more task than the
+                     * number of idle tasks, which is equal to the configured numbers of cores
+                     * then a task other than the idle task is ready to execute. */
+                    if( listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ tskIDLE_PRIORITY ] ) ) > ( UBaseType_t ) configNUM_CORES )
+                    {
+                        taskYIELD();
+                    }
+                    else
+                    {
+                        mtCOVERAGE_TEST_MARKER();
+                    }
+                }
+            #endif /* ( ( configUSE_PREEMPTION == 1 ) && ( configIDLE_SHOULD_YIELD == 1 ) ) */
+
+            #if ( configUSE_MINIMAL_IDLE_HOOK == 1 )
+                {
+                    extern void vApplicationMinimalIdleHook( void );
+
+                    /* Call the user defined function from within the idle task.  This
+                     * allows the application designer to add background functionality
+                     * without the overhead of a separate task.
+                     *
+                     * This hook is intended to manage core activity such as disabling cores that go idle.
+                     *
+                     * NOTE: vApplicationMinimalIdleHook() MUST NOT, UNDER ANY CIRCUMSTANCES,
+                     * CALL A FUNCTION THAT MIGHT BLOCK. */
+                    vApplicationMinimalIdleHook();
+                }
+            #endif /* configUSE_MINIMAL_IDLE_HOOK */
+        }
+    }
+#endif /* if ( configNUM_CORES > 1 ) */
 
 /*
  * -----------------------------------------------------------
@@ -4990,7 +5069,7 @@ static void prvResetNextTaskUnblockTime( void )
         return xReturn;
     }
 
-    TaskHandle_t xTaskGetCurrentTaskHandleCPU( UBaseType_t xCoreID )
+    TaskHandle_t xTaskGetCurrentTaskHandleCPU( BaseType_t xCoreID )
     {
         TaskHandle_t xReturn = NULL;
 
@@ -5391,7 +5470,7 @@ void vTaskYieldWithinAPI( void )
                     if( portCHECK_IF_IN_ISR() == pdFALSE )
                     {
                         portRELEASE_TASK_LOCK();
-                    portENABLE_INTERRUPTS();
+                        portENABLE_INTERRUPTS();
 
                         /* When a task yields in a critical section it just sets
                          * xYieldPending to true. So now that we have exited the

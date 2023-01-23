@@ -41,9 +41,14 @@
  *----------------------------------------------------------*/
 
 #define configUSE_PREEMPTION                     1
+#define configUSE_TASK_PREEMPTION_DISABLE        1
+#define configNUM_CORES                          2
+#define configUSE_CORE_AFFINITY                  1
+#define configRUN_MULTIPLE_PRIORITIES            1
 #define configSUPPORT_STATIC_ALLOCATION          0
 #define configSUPPORT_DYNAMIC_ALLOCATION         1
-#define configUSE_IDLE_HOOK                      0
+#define configUSE_IDLE_HOOK                      1
+#define configUSE_MINIMAL_IDLE_HOOK              1
 #define configUSE_TICK_HOOK                      0
 #define configUSE_MALLOC_FAILED_HOOK             1
 #define configCHECK_FOR_STACK_OVERFLOW           2
@@ -59,7 +64,6 @@
 #define configQUEUE_REGISTRY_SIZE                8
 #define configUSE_RECURSIVE_MUTEXES              1
 #define configUSE_COUNTING_SEMAPHORES            1
-#define configUSE_PORT_OPTIMISED_TASK_SELECTION  1
 
 /* Co-routine definitions. */
 #define configUSE_CO_ROUTINES                    0
@@ -90,6 +94,7 @@ to exclude the API function. */
 #define configSVCall_INTERRUPT_PRIORITY          0
 #define configPendSV_INTERRUPT_PRIORITY          3
 #define configSysTick_INTERRUPT_PRIORITY         3
+#define configSioProc_INTERRUPT_PRIORITY         3
 
 #endif /* FREERTOS_CONFIG_H */
 

@@ -21,7 +21,7 @@
  | THE USE OR OTHER DEALINGS IN THE SOFTWARE.                                 |
  |____________________________________________________________________________|
  |                                                                            |
- |  Author: Mihai Baneu                           Last modified: 05.Jan.2023  |
+ |  Author: Mihai Baneu                           Last modified: 23.Jan.2023  |
  |                                                                            |
  |___________________________________________________________________________*/
 
@@ -33,6 +33,13 @@ Product {
 
     Depends { name: 'rp' }
     Depends { name: 'cmsis' }
+    Depends { name: 'rp2040' }
+    Depends { name: 'pico_util' }
+    Depends { name: 'pico_time' }
+    Depends { name: 'pico_sync' }
+    Depends { name: 'pico_multicore' }
+    Depends { name: 'hardware_timer' }
+    Depends { name: 'hardware_sync' }
 
     rp.includePaths: [ 'inc', 'port' ]
     rp.defines: [ 
@@ -50,6 +57,13 @@ Product {
     Export {
         Depends { name: 'rp' }
         Depends { name: 'cmsis' }
+        Depends { name: 'rp2040' }
+        Depends { name: 'pico_util' }
+        Depends { name: 'pico_time' }
+        Depends { name: 'pico_sync' }
+        Depends { name: 'pico_multicore' }
+        Depends { name: 'hardware_timer' }
+        Depends { name: 'hardware_sync' }
         
         rp.includePaths: [
             FileInfo.joinPaths(exportingProduct.sourceDirectory, '/inc'),

@@ -304,7 +304,7 @@
 #endif
 
 #ifndef portCRITICAL_NESTING_IN_TCB
-    #define portCRITICAL_NESTING_IN_TCB    0
+    #define portCRITICAL_NESTING_IN_TCB    1
 #endif
 
 #ifndef configMAX_TASK_NAME_LEN
@@ -852,10 +852,6 @@
 
 #ifndef portPRIVILEGE_BIT
     #define portPRIVILEGE_BIT    ( ( UBaseType_t ) 0x00 )
-#endif
-
-#ifndef portYIELD_WITHIN_API
-    #define portYIELD_WITHIN_API    portYIELD
 #endif
 
 #ifndef portSUPPRESS_TICKS_AND_SLEEP

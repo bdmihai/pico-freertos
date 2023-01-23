@@ -21,7 +21,7 @@
  | THE USE OR OTHER DEALINGS IN THE SOFTWARE.                                 |
  |____________________________________________________________________________|
  |                                                                            |
- |  Author: Mihai Baneu                           Last modified: 08.Jan.2023  |
+ |  Author: Mihai Baneu                           Last modified: 23.Jan.2023  |
  |  Based on original M0+rp2040 port from http://www.FreeRTOS.org             |
  |___________________________________________________________________________*/
 
@@ -68,54 +68,39 @@ typedef unsigned long UBaseType_t;
 #define portSTACK_GROWTH						( -1 )
 #define portTICK_PERIOD_MS						( ( TickType_t ) 1000 / configTICK_RATE_HZ )
 #define portBYTE_ALIGNMENT						8
-#define portFORCE_INLINE 						inline __attribute__(( always_inline))
+#define portFORCE_INLINE 						inline __attribute__((always_inline))
 #define portMEMORY_BARRIER()					__DMB()
-/*-----------------------------------------------------------*/
-
-/* NVIC priority group definition. */
-#define portNVIC_PRIORITYGROUP_0               0x00000007U /*!< 0 bits for pre-emption priority 4 bits for subpriority */
-#define portNVIC_PRIORITYGROUP_1               0x00000006U /*!< 1 bits for pre-emption priority 3 bits for subpriority */
-#define portNVIC_PRIORITYGROUP_2               0x00000005U /*!< 2 bits for pre-emption priority 2 bits for subpriority */
-#define portNVIC_PRIORITYGROUP_3               0x00000004U /*!< 3 bits for pre-emption priority 1 bits for subpriority */
-#define portNVIC_PRIORITYGROUP_4               0x00000003U /*!< 4 bits for pre-emption priority 0 bits for subpriority */
 /*-----------------------------------------------------------*/
 
 /* Scheduler utilities. */
 #define portYIELD() 							vPortYield()
 #define portYIELD_FROM_ISR() 					vPortYield()
+#define portYIELD_CORE(x)                       vPortYieldCore(x)
 /*-----------------------------------------------------------*/
 
 /* Critical section management. */
-#define portSET_INTERRUPT_MASK_FROM_ISR()		ulSetInterruptMaskFromISR()
-#define portCLEAR_INTERRUPT_MASK_FROM_ISR(x)	vClearInterruptMaskFromISR( x )
-#define portDISABLE_INTERRUPTS()				vPortDisableInterrupts()
+#define portSET_INTERRUPT_MASK_FROM_ISR()		ulPortDisableInterrupts(); vTaskEnterCritical()
+#define portCLEAR_INTERRUPT_MASK_FROM_ISR(x)	vTaskExitCritical(); vPortRestoreInterrupts(x)
+
+#define portDISABLE_INTERRUPTS()				ulPortDisableInterrupts()
 #define portENABLE_INTERRUPTS()					vPortEnableInterrupts()
-#define portENTER_CRITICAL()					vPortEnterCritical()
-#define portEXIT_CRITICAL()						vPortExitCritical()
+#define portRESTORE_INTERRUPTS(x)      	        vPortRestoreInterrupts(x)
+#define portENTER_CRITICAL()					vTaskEnterCritical()
+#define portEXIT_CRITICAL()						vTaskExitCritical()
+
+#define portGET_ISR_LOCK()      				vPortGetISRLock()
+#define portRELEASE_ISR_LOCK()  				vPortReleaseISRLock()
+#define portGET_TASK_LOCK()     				vPortGetTaskLock()
+#define portRELEASE_TASK_LOCK() 				vPortReleaseTaskLock()
+
+#define portCHECK_IF_IN_ISR()                   (__get_current_exception() > 0)
+#define portGET_CORE_ID()                       vPortGetCoreId()
 /*-----------------------------------------------------------*/
 
  /* macros used to allow port/compiler specific language extensions.*/
 #define portTASK_FUNCTION_PROTO( vFunction, pvParameters )  void vFunction( void *pvParameters )
 #define portTASK_FUNCTION( vFunction, pvParameters )        void vFunction( void *pvParameters )
 /*-----------------------------------------------------------*/
-
-/* optimized task selection - max 32 priorities */
-#ifndef configUSE_PORT_OPTIMISED_TASK_SELECTION
-	#define configUSE_PORT_OPTIMISED_TASK_SELECTION 1
-#endif
-
-#if configUSE_PORT_OPTIMISED_TASK_SELECTION == 1
-	/* check the configuration. */
-	#if( configMAX_PRIORITIES > 32 )
-		#error configUSE_PORT_OPTIMISED_TASK_SELECTION can only be set to 1 when configMAX_PRIORITIES is less than or equal to 32.  It is very rare that a system requires more than 10 to 15 difference priorities as tasks that share a priority will time slice.
-	#endif
-
-	/* Store/clear the ready priorities in a bit map. */
-	#define portRECORD_READY_PRIORITY( uxPriority, uxReadyPriorities )    ( uxReadyPriorities ) |= ( 1UL << ( uxPriority ) )
-	#define portRESET_READY_PRIORITY( uxPriority, uxReadyPriorities )     ( uxReadyPriorities ) &= ~( 1UL << ( uxPriority ) )
-	#define portGET_HIGHEST_PRIORITY( uxTopPriority, uxReadyPriorities )  uxTopPriority = ( 31UL - ( uint32_t ) __builtin_clz( ( uxReadyPriorities ) ) )
-
-#endif /* configUSE_PORT_OPTIMISED_TASK_SELECTION */
 
 /* assertions enabled */
 #define configASSERT( x ) assert( x )

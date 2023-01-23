@@ -21,7 +21,7 @@
  | THE USE OR OTHER DEALINGS IN THE SOFTWARE.                                 |
  |____________________________________________________________________________|
  |                                                                            |
- |  Author: Mihai Baneu                           Last modified: 08.Jan.2023  |
+ |  Author: Mihai Baneu                           Last modified: 23.Jan.2023  |
  |  Based on original M0+rp2040 port from http://www.FreeRTOS.org             |
  |___________________________________________________________________________*/
 
@@ -29,6 +29,59 @@
 #include "cmsis_rp2040.h"
 #include "task.h"
 #include "port.h"
+#include "hardware/regs/sio.h"
+#include "hardware/structs/sio.h"
+#include "pico/multicore.h"
+
+#define portRTOS_SPINLOCK_COUNT                2
+
+static void prvFIFOInterruptHandler(void)
+{
+    /* We must remove the contents (which we don't care about)
+     * to clear the IRQ */
+    multicore_fifo_drain();
+    /* And explicitly clear any other IRQ flags */
+    multicore_fifo_clear_irq();
+
+    /* yeald on the current core */
+    vPortYield();
+}
+
+BaseType_t xPortStartSchedulerOnCore(void)
+{
+    /* add PendSV_IRQn, SVCall_IRQn and SysTick_IRQn handlers */
+    NVIC_SetVector(SVCall_IRQn, (uint32_t)vPortSVCHandler);
+    NVIC_SetVector(PendSV_IRQn, (uint32_t)vPortPendSVHandler);
+    NVIC_SetVector(SIO_IRQ_PROC0_IRQn + portGET_CORE_ID() , (uint32_t)prvFIFOInterruptHandler);
+
+    /* set PendSV_IRQn, SVCall_IRQn and SysTick_IRQn priority */
+    NVIC_SetPriority(SVCall_IRQn, configSVCall_INTERRUPT_PRIORITY);
+    NVIC_SetPriority(PendSV_IRQn, configPendSV_INTERRUPT_PRIORITY);
+    NVIC_SetPriority(SIO_IRQ_PROC0_IRQn + portGET_CORE_ID() , configSioProc_INTERRUPT_PRIORITY);
+
+    /* enable the SIO_IRQ_PROC0_IRQn or the SIO_IRQ_PROC1_IRQn */
+    NVIC_EnableIRQ(SIO_IRQ_PROC0_IRQn + portGET_CORE_ID() );
+
+    /* start the first task */
+    vPortStartFirstTask(portGET_CORE_ID());
+
+    /* Should never get here as the tasks will now be executing!  Call the task
+    exit error function to prevent compiler warnings about a static function
+    not being called in the case that the application writer overrides this
+    functionality. Call vTaskSwitchContext() so link time optimisation does not
+    remove the symbol. */
+    vTaskSwitchContext(portGET_CORE_ID());
+    vPortTaskExitError();
+
+    /* Should not get here! */
+    return 0;
+}
+
+static void prvPortStartSchedulerOnCore(void)
+{
+    portDISABLE_INTERRUPTS();
+    xPortStartSchedulerOnCore();
+}
 
 /**
  * @brief This is the startup of the scheduler. All necessary HW for the RTOS is
@@ -37,33 +90,19 @@
  */
 BaseType_t xPortStartScheduler(void)
 {
-    /* add PendSV_IRQn, SVCall_IRQn and SysTick_IRQn handlers */
-    NVIC_SetVector(SVCall_IRQn, (uint32_t)vPortSVCHandler);
-    NVIC_SetVector(PendSV_IRQn, (uint32_t)vPortPendSVHandler);
-    NVIC_SetVector(SysTick_IRQn, (uint32_t)vPortSysTickHandler);
+    /* claim the 2 spinlocks designed for the rtos scheduler */
+    spin_lock_claim(PICO_SPINLOCK_ID_OS1);
+    spin_lock_claim(PICO_SPINLOCK_ID_OS2);
 
-    /* set PendSV_IRQn, SVCall_IRQn and SysTick_IRQn priority */
-    NVIC_SetPriority(SVCall_IRQn, configSVCall_INTERRUPT_PRIORITY);
-    NVIC_SetPriority(PendSV_IRQn, configPendSV_INTERRUPT_PRIORITY);
-    NVIC_SetPriority(SysTick_IRQn, configSysTick_INTERRUPT_PRIORITY);
-
-    /* Initialise the critical nesting count ready for the first task. */
-    uxCriticalNesting = 0;
+    /* trigger the second core */
+    multicore_launch_core1(prvPortStartSchedulerOnCore);
 
     /* Start the timer that generates the tick ISR.  Interrupts are disabled
     here already. */
     vPortConfigureSysTick();
 
-    /* start the first task */
-    vPortStartFirstTask();
-
-    /* Should never get here as the tasks will now be executing!  Call the task
-    exit error function to prevent compiler warnings about a static function
-    not being called in the case that the application writer overrides this
-    functionality. Call vTaskSwitchContext() so link time optimisation does not
-    remove the symbol. */
-    vTaskSwitchContext();
-    vPortTaskExitError();
+    /* start the scheduler on the main core */
+    xPortStartSchedulerOnCore();
 
     /* Should not get here! */
     return 0;
@@ -77,7 +116,7 @@ void vPortEndScheduler(void)
 {
     /* Not implemented in ports where there is nothing to return to.
     Artificially force an assert. */
-    configASSERT( uxCriticalNesting == 1000UL );
+    configASSERT( 1L );
 }
 
 /**
@@ -115,4 +154,68 @@ void vPortYield(void)
     /* Data Synchronization Barrier and Instruction Synchronization Barrier */
     __DSB();
     __ISB();
+}
+
+void vPortYieldCore(int32_t core)
+{
+    (void) core;
+    sio_hw->fifo_wr = 0;
+}
+
+/* Note this is a single method with uxAcquire parameter since we have
+ * static vars, the method is always called with a compile time constant for
+ * uxAcquire, and the compiler should dothe right thing! */
+static inline void vPortRecursiveLock(uint32_t ulLockNum, volatile uint32_t *pxSpinLock, BaseType_t uxAcquire) {
+    static uint8_t ucOwnedByCore[configNUM_CORES];
+    static uint8_t ucRecursionCountByLock[portRTOS_SPINLOCK_COUNT];
+
+    uint32_t ulCoreNum = get_core_num();
+    uint32_t ulLockBit = 1u << ulLockNum;
+    configASSERT(ulLockBit < 256u );
+    if( uxAcquire )
+    {
+        if( __builtin_expect( !*pxSpinLock, 0 ) )
+        {
+            if( ucOwnedByCore[ulCoreNum] & ulLockBit )
+            {
+                configASSERT(ucRecursionCountByLock[ulLockNum] != 255u );
+                ucRecursionCountByLock[ulLockNum]++;
+                return;
+            }
+            while ( __builtin_expect( !*pxSpinLock, 0 ) );
+        }
+        __DMB();
+        configASSERT(ucRecursionCountByLock[ulLockNum] == 0 );
+        ucRecursionCountByLock[ulLockNum] = 1;
+        ucOwnedByCore[ulCoreNum] |= ulLockBit;
+    } else {
+        configASSERT((ucOwnedByCore[ulCoreNum] & ulLockBit) != 0 );
+        configASSERT(ucRecursionCountByLock[ulLockNum] != 0 );
+        if( !--ucRecursionCountByLock[ulLockNum] )
+        {
+            ucOwnedByCore[ulCoreNum] &= ~ulLockBit;
+            __DMB();
+            *pxSpinLock = 1;
+        }
+    }
+}
+
+void vPortGetISRLock()
+{
+    vPortRecursiveLock(0, spin_lock_instance(PICO_SPINLOCK_ID_OS1), pdTRUE);
+}
+
+void vPortReleaseISRLock()
+{
+    vPortRecursiveLock(0, spin_lock_instance(PICO_SPINLOCK_ID_OS1), pdFALSE);
+}
+
+void vPortGetTaskLock()
+{
+    vPortRecursiveLock(1, spin_lock_instance(PICO_SPINLOCK_ID_OS2), pdTRUE);
+}
+
+void vPortReleaseTaskLock()
+{
+    vPortRecursiveLock(1, spin_lock_instance(PICO_SPINLOCK_ID_OS2), pdFALSE);
 }
