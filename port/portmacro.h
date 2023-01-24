@@ -102,6 +102,12 @@ typedef unsigned long UBaseType_t;
 #define portTASK_FUNCTION( vFunction, pvParameters )        void vFunction( void *pvParameters )
 /*-----------------------------------------------------------*/
 
+/* stats utilities */
+#if configGENERATE_RUN_TIME_STATS == 1
+	#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()
+	#define portGET_RUN_TIME_COUNTER_VALUE()         vPortGetStatsTimerValue()
+#endif
+
 /* assertions enabled */
 #define configASSERT( x ) assert( x )
 

@@ -33,7 +33,12 @@
 #include "hardware/structs/sio.h"
 #include "pico/multicore.h"
 
-#define portRTOS_SPINLOCK_COUNT                2
+#define ISR_LOCK_BIT   0x01U
+#define TASK_LOCK_BIT  0x02U
+
+static uint8_t ucOwnedByCore[configNUM_CORES] = { 0, 0 };
+static uint8_t ucISRLockCount = 0;
+static uint8_t ucTaskLockCount = 0;
 
 static void prvFIFOInterruptHandler(void)
 {
@@ -97,7 +102,7 @@ BaseType_t xPortStartScheduler(void)
     /* trigger the second core */
     multicore_launch_core1(prvPortStartSchedulerOnCore);
 
-    /* Start the timer that generates the tick ISR.  Interrupts are disabled
+    /* Start the timer that generates the tick ISR. Interrupts are disabled
     here already. */
     vPortConfigureSysTick();
 
@@ -162,60 +167,79 @@ void vPortYieldCore(int32_t core)
     sio_hw->fifo_wr = 0;
 }
 
-/* Note this is a single method with uxAcquire parameter since we have
- * static vars, the method is always called with a compile time constant for
- * uxAcquire, and the compiler should dothe right thing! */
-static inline void vPortRecursiveLock(uint32_t ulLockNum, volatile uint32_t *pxSpinLock, BaseType_t uxAcquire) {
-    static uint8_t ucOwnedByCore[configNUM_CORES];
-    static uint8_t ucRecursionCountByLock[portRTOS_SPINLOCK_COUNT];
-
-    uint32_t ulCoreNum = get_core_num();
-    uint32_t ulLockBit = 1u << ulLockNum;
-    configASSERT(ulLockBit < 256u );
-    if( uxAcquire )
-    {
-        if( __builtin_expect( !*pxSpinLock, 0 ) )
-        {
-            if( ucOwnedByCore[ulCoreNum] & ulLockBit )
-            {
-                configASSERT(ucRecursionCountByLock[ulLockNum] != 255u );
-                ucRecursionCountByLock[ulLockNum]++;
-                return;
-            }
-            while ( __builtin_expect( !*pxSpinLock, 0 ) );
-        }
-        __DMB();
-        configASSERT(ucRecursionCountByLock[ulLockNum] == 0 );
-        ucRecursionCountByLock[ulLockNum] = 1;
-        ucOwnedByCore[ulCoreNum] |= ulLockBit;
-    } else {
-        configASSERT((ucOwnedByCore[ulCoreNum] & ulLockBit) != 0 );
-        configASSERT(ucRecursionCountByLock[ulLockNum] != 0 );
-        if( !--ucRecursionCountByLock[ulLockNum] )
-        {
-            ucOwnedByCore[ulCoreNum] &= ~ulLockBit;
-            __DMB();
-            *pxSpinLock = 1;
-        }
-    }
-}
-
 void vPortGetISRLock()
 {
-    vPortRecursiveLock(0, spin_lock_instance(PICO_SPINLOCK_ID_OS1), pdTRUE);
+    volatile uint32_t *pxSpinLock = spin_lock_instance(PICO_SPINLOCK_ID_OS1);
+    uint32_t ulCoreNum = get_core_num();
+
+    if(__builtin_expect(!*pxSpinLock, 0))
+    {
+        if(ucOwnedByCore[ulCoreNum] & ISR_LOCK_BIT)
+        {
+            configASSERT(ucISRLockCount != 255u);
+            ucISRLockCount++;
+            return;
+        }
+        while (__builtin_expect(!*pxSpinLock, 0));
+    }
+    __DMB();
+    configASSERT(ucISRLockCount == 0);
+    ucISRLockCount = 1;
+    ucOwnedByCore[ulCoreNum] |= ISR_LOCK_BIT;
 }
 
 void vPortReleaseISRLock()
 {
-    vPortRecursiveLock(0, spin_lock_instance(PICO_SPINLOCK_ID_OS1), pdFALSE);
+    volatile uint32_t *pxSpinLock = spin_lock_instance(PICO_SPINLOCK_ID_OS1);
+    uint32_t ulCoreNum = get_core_num();
+
+    configASSERT((ucOwnedByCore[ulCoreNum] & ISR_LOCK_BIT) != 0 );
+    configASSERT(ucISRLockCount != 0);
+    if(!--ucISRLockCount)
+    {
+        ucOwnedByCore[ulCoreNum] &= ~ISR_LOCK_BIT;
+        __DMB();
+        *pxSpinLock = 1;
+    }
 }
 
 void vPortGetTaskLock()
 {
-    vPortRecursiveLock(1, spin_lock_instance(PICO_SPINLOCK_ID_OS2), pdTRUE);
+    volatile uint32_t *pxSpinLock = spin_lock_instance(PICO_SPINLOCK_ID_OS2);
+    uint32_t ulCoreNum = get_core_num();
+
+    if( __builtin_expect(!*pxSpinLock, 0))
+    {
+        if(ucOwnedByCore[ulCoreNum] & TASK_LOCK_BIT)
+        {
+            configASSERT(ucTaskLockCount != 255u);
+            ucTaskLockCount++;
+            return;
+        }
+        while (__builtin_expect(!*pxSpinLock, 0));
+    }
+    __DMB();
+    configASSERT(ucTaskLockCount== 0);
+    ucTaskLockCount = 1;
+    ucOwnedByCore[ulCoreNum] |= TASK_LOCK_BIT;
 }
 
 void vPortReleaseTaskLock()
 {
-    vPortRecursiveLock(1, spin_lock_instance(PICO_SPINLOCK_ID_OS2), pdFALSE);
+    volatile uint32_t *pxSpinLock = spin_lock_instance(PICO_SPINLOCK_ID_OS2);
+    uint32_t ulCoreNum = get_core_num();
+
+    configASSERT((ucOwnedByCore[ulCoreNum] & TASK_LOCK_BIT) != 0);
+    configASSERT(ucTaskLockCount != 0);
+    if(!--ucTaskLockCount)
+    {
+        ucOwnedByCore[ulCoreNum] &= ~TASK_LOCK_BIT;
+        __DMB();
+        *pxSpinLock = 1;
+    }
+}
+
+uint32_t vPortGetStatsTimerValue(void)
+{
+    return time_us_64();
 }

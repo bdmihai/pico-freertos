@@ -66,3 +66,6 @@ extern void vPortStartFirstTask(int32_t core);
 /* svc C handler */
 extern void vPortServiceHandler(uint32_t *svc_args);
 
+/* stats gathering function */
+extern uint32_t vPortGetStatsTimerValue(void);
+
