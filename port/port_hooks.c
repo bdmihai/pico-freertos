@@ -59,3 +59,4 @@ void __attribute__((weak)) vApplicationIdleHook(void) { }
  *
  */
 void __attribute__((weak)) vApplicationMinimalIdleHook(void) { }
+

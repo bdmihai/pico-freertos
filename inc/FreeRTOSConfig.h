@@ -45,7 +45,7 @@
 #define configNUM_CORES                          2
 #define configUSE_CORE_AFFINITY                  1
 #define configRUN_MULTIPLE_PRIORITIES            1
-#define configSUPPORT_STATIC_ALLOCATION          0
+#define configSUPPORT_STATIC_ALLOCATION          1
 #define configSUPPORT_DYNAMIC_ALLOCATION         1
 #define configUSE_IDLE_HOOK                      1
 #define configUSE_MINIMAL_IDLE_HOOK              1
