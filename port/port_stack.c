@@ -32,6 +32,10 @@
 /* initial xPSR value on the stack - set the Thumb state to 1 */
 #define portINITIAL_XPSR                    0x01000000
 
+/* for strict compliance with the Cortex-M spec the task start address should
+have bit-0 clear, as it is loaded into the PC on exit from an ISR. */
+#define portSTART_ADDRESS_MASK              0XFFFFFFFE
+
 /* address where a task should return. used to trap tasks that attempt to
 return from their implementing functions (tasks should call vTaskDelete if
 they want to exit */
@@ -49,13 +53,13 @@ they want to exit */
  * @param pvParameters
  * @return StackType_t*
  */
-StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t pxCode, void *pvParameters )
+StackType_t *pxPortInitialiseStack(StackType_t *pxTopOfStack, TaskFunction_t pxCode, void *pvParameters)
 {
     pxTopOfStack--;
     *pxTopOfStack = (StackType_t) portINITIAL_XPSR;                         		/* xPSR */
 
     pxTopOfStack--;
-    *pxTopOfStack = (StackType_t) pxCode;                                           /* PC */
+    *pxTopOfStack = (StackType_t) pxCode & (StackType_t)portSTART_ADDRESS_MASK;     /* PC */
 
     pxTopOfStack--;
     *pxTopOfStack = (StackType_t) portTASK_RETURN_ADDRESS;                			/* LR */

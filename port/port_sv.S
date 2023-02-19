@@ -21,7 +21,7 @@
  | THE USE OR OTHER DEALINGS IN THE SOFTWARE.                                 |
  |____________________________________________________________________________|
  |                                                                            |
- |  Author: Mihai Baneu                           Last modified: 23.Jan.2023  |
+ |  Author: Mihai Baneu                           Last modified: 19.Feb.2023  |
  |  Based on original M0+rp2040 port from http://www.FreeRTOS.org             |
  |___________________________________________________________________________*/
  
@@ -30,6 +30,8 @@
 #include "hardware/regs/sio.h"
 
 .syntax unified
+
+#define INITIAL_EXC_RETURN  0XFFFFFFFD
 
 #if FREERTOS_IN_RAM
 #define port_section data
@@ -90,53 +92,63 @@ vPortRestoreInterrupts:
 /*-----------------------------------------------------------*/
 /*                     vPortStartFirstTask                   */
 /*-----------------------------------------------------------*/
-.section .port_section.vPortStartFirstTask, "ax", %progbits
+.section .text.vPortStartFirstTask, "ax", %progbits
 .global vPortStartFirstTask
 .type vPortStartFirstTask, %function
+
+/* This function starts the first task by executing the Supervisor Call command. In 
+this way the context of the first task is executed. */
 vPortStartFirstTask:
-    /* set the msp back to the start of the stack - r0 has the core index */
+   /* set the msp back to the start of the stack - r0 has the core index */
     adr r1, StackPointers
     lsls r0, #2
     ldr r1, [r1, r0]
     msr msp, r1
 
+    /* globally enable interrupts. */
+    cpsie i
+    
+    /* system call to start first task. */
+    svc 0
+
+.align 4
+StackPointers:
+.word __stack0_top
+.word __stack1_top
+
+.size vPortStartFirstTask, .-vPortStartFirstTask
+
+/*-----------------------------------------------------------*/
+/*                  vPortSetFirstTaskContext                 */
+/*-----------------------------------------------------------*/
+.section .text.vPortSetFirstTaskContext, "ax", %progbits
+.global vPortSetFirstTaskContext
+.type vPortSetFirstTaskContext, %function
+vPortSetFirstTaskContext:
     /* get the location of the pxCurrentTCB */
     ldr	r2, =pxCurrentTCBs
+    lsls r0, #2
     adds r2, r0
     ldr r3, [r2]
 
     /* first item in pxCurrentTCB is the task top of stack */
     ldr r0, [r3]
 
-    /* discard everything up to r0. */
+    /* discard everything up to r0 */
     adds r0, #32
 
-    /* reset privileges and set the psp as the stack pointer */
+    /* set the new process stack pointer */
     msr psp, r0
-    mrs r0, control
-    movs r1, #2
-    orrs r0, r1
-    msr control, r0
     isb
 
-    pop  {r0-r5}                /* Pop the registers that are saved automatically. */
-    mov  lr, r5                 /* lr is now in r5. */
-    pop  {r3}                   /* Return address is now in r3. */
-    pop  {r2}                   /* Pop and discard XPSR. */
-    
-    /* globally enable interrupts. */
-    cpsie i
+    /* return from handler mode to thread mode: basically pops r0-r4, r12, r14(lr), r15(pc), psr */
+    ldr r0, =INITIAL_EXC_RETURN
+    bx r0
 
-    /* jump to the first task code */
-    bx r3
-    
 .align 4
-StackPointers:
-    .word __stack0_top
-    .word __stack1_top
-    .word pxCurrentTCBs
+.word pxCurrentTCBs
 
-.size vPortStartFirstTask, .-vPortStartFirstTask
+.size vPortSetFirstTaskContext, .-vPortSetFirstTaskContext
 
 /*-----------------------------------------------------------*/
 /*                       vPortSVCHandler                     */
@@ -156,7 +168,7 @@ vPortSVCHandler:
 2:
     mrs r0, psp
 3:
-    bl vPortServiceHandler
+    b vPortServiceHandler
 
 .size vPortSVCHandler, .-vPortSVCHandler
 
@@ -225,7 +237,7 @@ vPortPendSVHandler:
     bx r3
 
 .align 4
-    .word pxCurrentTCBs
+.word pxCurrentTCBs
 
 .size vPortPendSVHandler, .-vPortPendSVHandler
 

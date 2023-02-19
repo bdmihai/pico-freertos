@@ -21,7 +21,7 @@
  | THE USE OR OTHER DEALINGS IN THE SOFTWARE.                                 |
  |____________________________________________________________________________|
  |                                                                            |
- |  Author: Mihai Baneu                           Last modified: 23.Jan.2023  |
+ |  Author: Mihai Baneu                           Last modified: 19.Feb.2023  |
  |  Based on original M0+rp2040 port from http://www.FreeRTOS.org             |
  |___________________________________________________________________________*/
 
@@ -40,18 +40,6 @@ static uint8_t ucOwnedByCore[configNUM_CORES] = { 0, 0 };
 static uint8_t ucISRLockCount = 0;
 static uint8_t ucTaskLockCount = 0;
 
-static void prvFIFOInterruptHandler(void)
-{
-    /* We must remove the contents (which we don't care about)
-     * to clear the IRQ */
-    multicore_fifo_drain();
-    /* And explicitly clear any other IRQ flags */
-    multicore_fifo_clear_irq();
-
-    /* yeald on the current core */
-    vPortYield();
-}
-
 void vPortStartSchedulerOnCore(void)
 {
     /* make sure all interupts are disabled */
@@ -60,7 +48,7 @@ void vPortStartSchedulerOnCore(void)
     /* add PendSV_IRQn, SVCall_IRQn and SysTick_IRQn handlers */
     NVIC_SetVector(SVCall_IRQn, (uint32_t)vPortSVCHandler);
     NVIC_SetVector(PendSV_IRQn, (uint32_t)vPortPendSVHandler);
-    NVIC_SetVector(SIO_IRQ_PROC0_IRQn + portGET_CORE_ID() , (uint32_t)prvFIFOInterruptHandler);
+    NVIC_SetVector(SIO_IRQ_PROC0_IRQn + portGET_CORE_ID() , (uint32_t)vPortFIFOHandler);
 
     /* set PendSV_IRQn, SVCall_IRQn and SysTick_IRQn priority */
     NVIC_SetPriority(SVCall_IRQn, configSVCall_INTERRUPT_PRIORITY);
@@ -103,49 +91,6 @@ BaseType_t xPortStartScheduler(void)
     /* start the scheduler on the main core */
     vPortStartSchedulerOnCore();
     return 0;
-}
-
-/**
- * @brief Handler for the Supervisor Call.
- * 
- * @param svc_args 
- */
-void vPortServiceHandler(uint32_t *svc_args)
-{
-    uint8_t svc_number = ((char *) svc_args[6])[-2]; //Memory[(Stacked PC)-2]
-    // r0 = svc_args[0];
-    // r1 = svc_args[1];
-    // r2 = svc_args[2];
-    // r3 = svc_args[3];
-
-    switch (svc_number)
-    {
-        case 0:
-            vPortYield();
-            break;
-    }
-}
-
-/**
- * @brief Yield the next task that needs to be executed.
- *
- * The PendSV interrupt is activated for changin the context.
- *
- */
-void vPortYield(void)
-{
-    /* context switching is performed in the PendSV interrupt. Pend the PendSV interrupt. */
-    SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
-
-    /* Data Synchronization Barrier and Instruction Synchronization Barrier */
-    __DSB();
-    __ISB();
-}
-
-void vPortYieldCore(int32_t core)
-{
-    (void) core;
-    sio_hw->fifo_wr = 0;
 }
 
 void vPortGetISRLock()

@@ -59,9 +59,13 @@ extern void vPortYieldCore(int32_t core);
 extern void vPortSVCHandler();
 extern void vPortPendSVHandler();
 extern void vPortSysTickHandler();
+extern void vPortFIFOHandler();
 
 /* start the first task */
 extern void vPortStartFirstTask(int32_t core);
+
+/* set first task context */
+extern void vPortSetFirstTaskContext(int32_t core);
 
 /* svc C handler */
 extern void vPortServiceHandler(uint32_t *svc_args);
