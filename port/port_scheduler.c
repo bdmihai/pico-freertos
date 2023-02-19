@@ -52,8 +52,11 @@ static void prvFIFOInterruptHandler(void)
     vPortYield();
 }
 
-BaseType_t xPortStartSchedulerOnCore(void)
+void vPortStartSchedulerOnCore(void)
 {
+    /* make sure all interupts are disabled */
+    portDISABLE_INTERRUPTS();
+
     /* add PendSV_IRQn, SVCall_IRQn and SysTick_IRQn handlers */
     NVIC_SetVector(SVCall_IRQn, (uint32_t)vPortSVCHandler);
     NVIC_SetVector(PendSV_IRQn, (uint32_t)vPortPendSVHandler);
@@ -77,15 +80,6 @@ BaseType_t xPortStartSchedulerOnCore(void)
     remove the symbol. */
     vTaskSwitchContext(portGET_CORE_ID());
     vPortTaskExitError();
-
-    /* Should not get here! */
-    return 0;
-}
-
-static void prvPortStartSchedulerOnCore(void)
-{
-    portDISABLE_INTERRUPTS();
-    xPortStartSchedulerOnCore();
 }
 
 /**
@@ -100,28 +94,15 @@ BaseType_t xPortStartScheduler(void)
     spin_lock_claim(PICO_SPINLOCK_ID_OS2);
 
     /* trigger the second core */
-    multicore_launch_core1(prvPortStartSchedulerOnCore);
+    multicore_launch_core1(vPortStartSchedulerOnCore);
 
-    /* Start the timer that generates the tick ISR. Interrupts are disabled
+    /* start the timer that generates the tick ISR. Interrupts are disabled
     here already. */
     vPortConfigureSysTick();
 
     /* start the scheduler on the main core */
-    xPortStartSchedulerOnCore();
-
-    /* Should not get here! */
+    vPortStartSchedulerOnCore();
     return 0;
-}
-
-/**
- * @brief End scheduler.
- *
- */
-void vPortEndScheduler(void)
-{
-    /* Not implemented in ports where there is nothing to return to.
-    Artificially force an assert. */
-    configASSERT( 1L );
 }
 
 /**
