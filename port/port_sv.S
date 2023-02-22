@@ -241,4 +241,8 @@ vPortPendSVHandler:
 
 .size vPortPendSVHandler, .-vPortPendSVHandler
 
+.global pxCurrentTCB
+pxCurrentTCB:
+.word pxCurrentTCBs
+
 .end

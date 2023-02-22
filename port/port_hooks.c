@@ -28,6 +28,64 @@
 #include "picortos.h"
 #include "portmacro.h"
 #include "port.h"
+#include "task.h"
+
+/**
+ * @brief panic.
+ *
+ * This is a dummy function as the real panic should be implemented by application.
+ *
+ */
+void  __attribute__((weak)) panic(const char *fmt, ...)
+{
+    (void)(fmt);
+}
+
+/**
+ * @brief Used to catch tasks that attempt to return from their implementing function.
+ *
+ * A function that implements a task must not exit or attempt to return to its caller
+ * as there is nothing to return to. If a task wants to exit it should instead call
+ * vTaskDelete.
+ */
+void __attribute__((weak))vPortTaskExitError(void)
+{
+    panic("vPortTaskExitError: a function that implements a task must not exit or attempt to return");
+}
+
+/**
+ * @brief Blink two short pulses if malloc fails.
+ *
+ * This function will only be called if configUSE_MALLOC_FAILED_HOOK is set to
+ * 1 in FreeRTOSConfig.h.  It is a hook function that will get called if a call
+ * to pvPortMalloc() fails. pvPortMalloc() is called internally by the kernel
+ * whenever a task, queue, timer or semaphore is created.  It is also called by
+ * various parts of the demo application.  If heap_1.c or heap_2.c are used,
+ * then the size of the heap available to pvPortMalloc() is defined by
+ * configTOTAL_HEAP_SIZE in FreeRTOSConfig.h, and the xPortGetFreeHeapSize() API
+ * function can be used to query the size of free heap space that remains
+ * (although it does not provide information on how the remaining heap might be
+ * fragmented).
+ */
+void __attribute__((weak))vApplicationMallocFailedHook()
+{
+    panic("vApplicationMallocFailedHook: malloc failed");
+}
+
+/**
+ * @brief Run time stack overflow checking hook function.
+ *
+ * Run time stack overflow checking is performed if configCHECK_FOR_STACK_OVERFLOW
+ * is defined to 1 or 2.  This hook function is called if a stack overflow is detected.
+ * \param[in] pxTask Task handle
+ * \param[in] pcTaskName Task name
+ */
+void __attribute__((weak))vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName)
+{
+    (void)pcTaskName;
+    (void)pxTask;
+    panic("vApplicationStackOverflowHook: stack overflow is detected");
+}
 
 /**
  * This function will be called by each tick interrupt if configUSE_TICK_HOOK

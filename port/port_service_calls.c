@@ -28,6 +28,7 @@
 #include "picortos.h"
 #include "cmsis_rp2040.h"
 #include "port.h"
+#include "pico/time.h"
 #include "pico/multicore.h"
 
 /**
@@ -35,10 +36,11 @@
 */
 void vPortFIFOHandler(void)
 {
-    /* We must remove the contents (which we don't care about)
+    /* remove the contents (which we don't care about)
      * to clear the IRQ */
     multicore_fifo_drain();
-    /* And explicitly clear any other IRQ flags */
+
+    /* and explicitly clear any other IRQ flags */
     multicore_fifo_clear_irq();
 
     /* yeald on the current core */
@@ -89,4 +91,9 @@ void vPortYieldCore(int32_t core)
 {
     (void) core;
     sio_hw->fifo_wr = 0;
+}
+
+uint32_t vPortGetStatsTimerValue(void)
+{
+    return time_us_64();
 }

@@ -29,8 +29,6 @@
 #include "cmsis_rp2040.h"
 #include "task.h"
 #include "port.h"
-#include "hardware/regs/sio.h"
-#include "hardware/structs/sio.h"
 #include "pico/multicore.h"
 
 #define ISR_LOCK_BIT   0x01U
@@ -163,9 +161,4 @@ void vPortReleaseTaskLock()
         __DMB();
         *pxSpinLock = 1;
     }
-}
-
-uint32_t vPortGetStatsTimerValue(void)
-{
-    return time_us_64();
 }
